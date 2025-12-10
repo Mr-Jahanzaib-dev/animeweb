@@ -26,8 +26,11 @@ const httpsAgent = new https.Agent({
 // Helper function to fetch from API
 const fetchFromAPI = async (endpoint, parameters) => {
   try {
-    const separator = parameters.startsWith('?') ? '' : '?';
-    const url = `${API_BASE_URL}/${endpoint}${separator}${parameters}&key=${API_KEY}`;
+    // Ensure proper parameter concatenation
+    const hasQuestionMark = parameters.startsWith('?');
+    const separator = hasQuestionMark ? '&' : '?';
+    const cleanParams = hasQuestionMark ? parameters.substring(1) : parameters;
+    const url = `${API_BASE_URL}/${endpoint}${separator}${cleanParams}&key=${API_KEY}`;
     
     console.log('🌐 Requesting:', url);
     
@@ -41,7 +44,11 @@ const fetchFromAPI = async (endpoint, parameters) => {
     });
     
     console.log('✅ Success! Status:', response.status);
-    console.log('📦 Response data:', JSON.stringify(response.data, null, 2)); // Add this line
+    console.log('📦 Total posts received:', response.data.posts?.length || 0);
+    console.log('📄 Page info:', {
+      current: response.data.current_page,
+      total: response.data.total_pages
+    });
     
     return response.data;
   } catch (error) {
@@ -71,12 +78,13 @@ const organizeAnime = (anime) => {
     subOrDub: anime.sub == 0 ? "SUB" : "DUB",
     overview: anime.overview,
     release: anime.anime_rel_date,
-    year: year,  // Now properly extracts year
+    year: year,
     rating: anime.rating,
     complete: anime.anime_com_date === "0000-00-00" ? null : anime.anime_com_date,
     views: anime.total_views,
     duration: anime.duration,
     episodes: anime.total_episodes,
+    tags: anime.tags || [],
     age: {
       id: anime.age_id,
       short_name: anime.age_name,
@@ -88,7 +96,17 @@ const organizeAnime = (anime) => {
     }
   };
 };
-// Routes
+
+// ==================== ROUTES ====================
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'API server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Search Anime
 app.get('/api/search', async (req, res) => {
@@ -98,7 +116,9 @@ app.get('/api/search', async (req, res) => {
     return res.status(400).json({ error: 'Search term is required' });
   }
 
-  const data = await fetchFromAPI('anime/search.php', `?keyword=${term}&limit=${limit}&page=${page}`);
+  console.log(`🔍 Searching for: "${term}" - Page: ${page}, Limit: ${limit}`);
+
+  const data = await fetchFromAPI('anime/search.php', `keyword=${term}&limit=${limit}&page=${page}`);
   
   if (!data) {
     return res.status(500).json({ error: 'Failed to fetch data' });
@@ -106,10 +126,38 @@ app.get('/api/search', async (req, res) => {
 
   const response = {
     total_pages: data.total_pages || 0,
-    current_page: data.current_page || 0,
+    current_page: parseInt(page),
     posts: data.posts ? data.posts.map(organizeAnime) : []
   };
 
+  console.log(`✅ Found ${response.posts.length} results for "${term}"`);
+  res.json(response);
+});
+
+// Get Anime by Genre
+app.get('/api/genre', async (req, res) => {
+  const { genre, page = 1, limit = 12 } = req.query;
+  
+  if (!genre) {
+    return res.status(400).json({ error: 'Genre is required' });
+  }
+
+  console.log(`🎭 Fetching ${genre} anime - Page: ${page}, Limit: ${limit}`);
+  
+  // Use search to filter by genre
+  const data = await fetchFromAPI('anime/search.php', `keyword=${genre}&limit=${limit}&page=${page}`);
+  
+  if (!data) {
+    return res.status(500).json({ error: 'Failed to fetch data' });
+  }
+
+  const response = {
+    total_pages: data.total_pages || 0,
+    current_page: parseInt(page),
+    posts: data.posts ? data.posts.map(organizeAnime) : []
+  };
+
+  console.log(`✅ Returning ${response.posts.length} ${genre} anime for page ${page}`);
   res.json(response);
 });
 
@@ -117,12 +165,16 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/anime/:slug', async (req, res) => {
   const { slug } = req.params;
   
-  const data = await fetchFromAPI('anime/anime.php', `?slug=${slug}`);
+  console.log('🔍 Fetching anime by slug:', slug);
+  
+  const data = await fetchFromAPI('anime/anime.php', `slug=${slug}`);
   
   if (!data) {
+    console.error('❌ Anime not found for slug:', slug);
     return res.status(404).json({ error: 'Anime not found' });
   }
 
+  console.log('✅ Anime found:', data.anime_name);
   res.json(organizeAnime(data));
 });
 
@@ -130,9 +182,12 @@ app.get('/api/anime/:slug', async (req, res) => {
 app.get('/api/anime/:id/seasons', async (req, res) => {
   const { id } = req.params;
   
-  const data = await fetchFromAPI('anime/my-seasons.php', `?animeid=${id}`);
+  console.log('🔍 Fetching seasons for anime ID:', id);
+  
+  const data = await fetchFromAPI('anime/my-seasons.php', `animeid=${id}`);
   
   if (!data || !Array.isArray(data)) {
+    console.log('⚠️ No seasons found for anime ID:', id);
     return res.json({ seasons_count: 0, seasons: [] });
   }
 
@@ -144,6 +199,7 @@ app.get('/api/anime/:id/seasons', async (req, res) => {
     }))
   };
 
+  console.log('✅ Found', response.seasons_count, 'seasons');
   res.json(response);
 });
 
@@ -151,9 +207,12 @@ app.get('/api/anime/:id/seasons', async (req, res) => {
 app.get('/api/episodes/:seasonId', async (req, res) => {
   const { seasonId } = req.params;
   
-  const data = await fetchFromAPI('anime/episodes.php', `?seasonid=${seasonId}`);
+  console.log('🔍 Fetching episodes for season ID:', seasonId);
+  
+  const data = await fetchFromAPI('anime/episodes.php', `seasonid=${seasonId}`);
   
   if (!data || !Array.isArray(data)) {
+    console.log('⚠️ No episodes found for season ID:', seasonId);
     return res.json([]);
   }
 
@@ -165,6 +224,7 @@ app.get('/api/episodes/:seasonId', async (req, res) => {
     note: ep.note
   }));
 
+  console.log('✅ Found', episodes.length, 'episodes');
   res.json(episodes);
 });
 
@@ -172,12 +232,17 @@ app.get('/api/episodes/:seasonId', async (req, res) => {
 app.get('/api/episode/:episodeId/links', async (req, res) => {
   const { episodeId } = req.params;
   
-  const data = await fetchFromAPI('anime/episode-new.php', `?episodeid=${episodeId}`);
+  console.log('🔍 Fetching links for episode ID:', episodeId);
+  
+  const data = await fetchFromAPI('anime/episode-new.php', `episodeid=${episodeId}`);
   
   if (!data) {
+    console.error('❌ Episode links not found for ID:', episodeId);
     return res.status(404).json({ error: 'Episode links not found' });
   }
 
+  console.log('✅ Episode links found');
+  console.log('📊 Servers available:', data.servers?.length || 0);
   res.json(data);
 });
 
@@ -185,8 +250,10 @@ app.get('/api/episode/:episodeId/links', async (req, res) => {
 app.get('/api/popular', async (req, res) => {
   const { duration = 'month', page = 1, limit = 12 } = req.query;
   
+  console.log(`⭐ Fetching popular anime (${duration}) - Page: ${page}, Limit: ${limit}`);
+  
   const popularType = duration === 'month' ? 'popular' : 'today';
-  const data = await fetchFromAPI('anime/test.php', `?sort=${popularType}&page=${page}&limit=${limit}`);
+  const data = await fetchFromAPI('anime/test.php', `sort=${popularType}&page=${page}&limit=${limit}`);
   
   if (!data) {
     return res.status(500).json({ error: 'Failed to fetch data' });
@@ -194,18 +261,30 @@ app.get('/api/popular', async (req, res) => {
 
   const response = {
     total_pages: data.total_pages || 0,
-    current_page: data.current_page || 0,
+    current_page: parseInt(page),
     posts: data.posts ? data.posts.map(organizeAnime) : []
   };
 
+  console.log(`✅ Returning ${response.posts.length} popular anime for page ${page}`);
   res.json(response);
 });
 
-// Get Series
+// Get Series (TV Shows)
 app.get('/api/series', async (req, res) => {
-  const { page = 1, limit = 12 } = req.query;
+  const { page = 1, limit = 12, status } = req.query;
   
-  const data = await fetchFromAPI('anime/test.php', `?sort=new&type=tv&page=${page}&limit=${limit}`);
+  console.log(`📺 Fetching series - Page: ${page}, Limit: ${limit}, Status: ${status || 'all'}`);
+  
+  let params = `sort=new&type=tv&page=${page}&limit=${limit}`;
+  
+  // Add status filter if provided
+  if (status === 'ongoing') {
+    params += '&status=ongoing';
+  } else if (status === 'completed') {
+    params += '&status=completed';
+  }
+  
+  const data = await fetchFromAPI('anime/test.php', params);
   
   if (!data) {
     return res.status(500).json({ error: 'Failed to fetch data' });
@@ -213,10 +292,11 @@ app.get('/api/series', async (req, res) => {
 
   const response = {
     total_pages: data.total_pages || 0,
-    current_page: data.current_page || 0,
+    current_page: parseInt(page),
     posts: data.posts ? data.posts.map(organizeAnime) : []
   };
 
+  console.log(`✅ Returning ${response.posts.length} series for page ${page}`);
   res.json(response);
 });
 
@@ -224,7 +304,9 @@ app.get('/api/series', async (req, res) => {
 app.get('/api/movies', async (req, res) => {
   const { page = 1, limit = 12 } = req.query;
   
-  const data = await fetchFromAPI('anime/test.php', `?type=movie&sort=new&page=${page}&limit=${limit}`);
+  console.log(`🎬 Fetching movies - Page: ${page}, Limit: ${limit}`);
+  
+  const data = await fetchFromAPI('anime/test.php', `type=movie&sort=new&page=${page}&limit=${limit}`);
   
   if (!data) {
     return res.status(500).json({ error: 'Failed to fetch data' });
@@ -232,10 +314,11 @@ app.get('/api/movies', async (req, res) => {
 
   const response = {
     total_pages: data.total_pages || 0,
-    current_page: data.current_page || 0,
+    current_page: parseInt(page),
     posts: data.posts ? data.posts.map(organizeAnime) : []
   };
 
+  console.log(`✅ Returning ${response.posts.length} movies for page ${page}`);
   res.json(response);
 });
 
@@ -243,7 +326,9 @@ app.get('/api/movies', async (req, res) => {
 app.get('/api/random', async (req, res) => {
   const { page = 1, limit = 12 } = req.query;
   
-  const data = await fetchFromAPI('anime/test.php', `?sort=random&page=${page}&limit=${limit}`);
+  console.log(`🎲 Fetching random anime - Page: ${page}, Limit: ${limit}`);
+  
+  const data = await fetchFromAPI('anime/test.php', `sort=random&page=${page}&limit=${limit}`);
   
   if (!data) {
     return res.status(500).json({ error: 'Failed to fetch data' });
@@ -251,10 +336,11 @@ app.get('/api/random', async (req, res) => {
 
   const response = {
     total_pages: data.total_pages || 0,
-    current_page: data.current_page || 0,
+    current_page: parseInt(page),
     posts: data.posts ? data.posts.map(organizeAnime) : []
   };
 
+  console.log(`✅ Returning ${response.posts.length} random anime for page ${page}`);
   res.json(response);
 });
 
@@ -262,17 +348,227 @@ app.get('/api/random', async (req, res) => {
 app.get('/api/movie/:slug/links', async (req, res) => {
   const { slug } = req.params;
   
-  const data = await fetchFromAPI('anime/movie.php', `?slug=${slug}&new=1`);
+  console.log('🎬 Fetching movie links for slug:', slug);
+  
+  const data = await fetchFromAPI('anime/movie.php', `slug=${slug}&new=1`);
   
   if (!data) {
+    console.error('❌ Movie links not found for slug:', slug);
     return res.status(404).json({ error: 'Movie links not found' });
   }
 
+  console.log('✅ Movie links found');
+  console.log('📊 Servers available:', data.servers?.length || data.links?.length || 0);
   res.json(data);
+});
+
+// Get Recently Added
+app.get('/api/recent', async (req, res) => {
+  const { page = 1, limit = 12 } = req.query;
+  
+  console.log(`🆕 Fetching recent anime - Page: ${page}, Limit: ${limit}`);
+  
+  const data = await fetchFromAPI('anime/test.php', `sort=new&page=${page}&limit=${limit}`);
+  
+  if (!data) {
+    return res.status(500).json({ error: 'Failed to fetch data' });
+  }
+
+  const response = {
+    total_pages: data.total_pages || 0,
+    current_page: parseInt(page),
+    posts: data.posts ? data.posts.map(organizeAnime) : []
+  };
+
+  console.log(`✅ Returning ${response.posts.length} recent anime for page ${page}`);
+  res.json(response);
+});
+
+// Get All Content (Series + Movies + Popular) for filtering
+app.get('/api/all-content', async (req, res) => {
+  const { page = 1, limit = 50 } = req.query;
+  
+  try {
+    console.log(`🔄 Fetching all content - Page: ${page}, Limit: ${limit}`);
+    
+    // Fetch different types of content
+    const [seriesData, moviesData, popularData] = await Promise.all([
+      fetchFromAPI('anime/test.php', `sort=new&type=tv&page=${page}&limit=${limit}`),
+      fetchFromAPI('anime/test.php', `type=movie&sort=new&page=${page}&limit=${limit}`),
+      fetchFromAPI('anime/test.php', `sort=popular&page=${page}&limit=${limit}`)
+    ]);
+    
+    // Combine all posts
+    const allPosts = [
+      ...(seriesData?.posts || []),
+      ...(moviesData?.posts || []),
+      ...(popularData?.posts || [])
+    ];
+    
+    // Remove duplicates based on anime_id
+    const uniquePosts = Array.from(
+      new Map(allPosts.map(item => [item.anime_id, item])).values()
+    );
+    
+    const response = {
+      total_pages: Math.max(
+        seriesData?.total_pages || 0,
+        moviesData?.total_pages || 0,
+        popularData?.total_pages || 0
+      ),
+      current_page: parseInt(page),
+      posts: uniquePosts.map(organizeAnime)
+    };
+    
+    console.log(`✅ Returning ${response.posts.length} unique items for page ${page}`);
+    res.json(response);
+  } catch (error) {
+    console.error('❌ Error in all-content:', error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// Get Ongoing Anime
+app.get('/api/ongoing', async (req, res) => {
+  const { page = 1, limit = 12 } = req.query;
+  
+  console.log(`▶️ Fetching ongoing anime - Page: ${page}, Limit: ${limit}`);
+  
+  const data = await fetchFromAPI('anime/test.php', `sort=new&type=tv&page=${page}&limit=${limit}`);
+  
+  if (!data) {
+    return res.status(500).json({ error: 'Failed to fetch data' });
+  }
+
+  // Filter for ongoing anime (where complete date is null or future)
+  const ongoingAnime = data.posts ? data.posts.filter(anime => {
+    return !anime.anime_com_date || anime.anime_com_date === "0000-00-00";
+  }) : [];
+
+  const response = {
+    total_pages: data.total_pages || 0,
+    current_page: parseInt(page),
+    posts: ongoingAnime.map(organizeAnime)
+  };
+
+  console.log(`✅ Returning ${response.posts.length} ongoing anime for page ${page}`);
+  res.json(response);
+});
+
+// Get Completed Anime
+app.get('/api/completed', async (req, res) => {
+  const { page = 1, limit = 12 } = req.query;
+  
+  console.log(`✅ Fetching completed anime - Page: ${page}, Limit: ${limit}`);
+  
+  const data = await fetchFromAPI('anime/test.php', `sort=new&type=tv&page=${page}&limit=${limit}`);
+  
+  if (!data) {
+    return res.status(500).json({ error: 'Failed to fetch data' });
+  }
+
+  // Filter for completed anime
+  const completedAnime = data.posts ? data.posts.filter(anime => {
+    return anime.anime_com_date && anime.anime_com_date !== "0000-00-00";
+  }) : [];
+
+  const response = {
+    total_pages: data.total_pages || 0,
+    current_page: parseInt(page),
+    posts: completedAnime.map(organizeAnime)
+  };
+
+  console.log(`✅ Returning ${response.posts.length} completed anime for page ${page}`);
+  res.json(response);
+});
+
+// Get API Statistics
+app.get('/api/stats', async (req, res) => {
+  try {
+    const [popularData, seriesData, moviesData] = await Promise.all([
+      fetchFromAPI('anime/test.php', 'sort=popular&page=1&limit=1'),
+      fetchFromAPI('anime/test.php', 'sort=new&type=tv&page=1&limit=1'),
+      fetchFromAPI('anime/test.php', 'type=movie&sort=new&page=1&limit=1')
+    ]);
+
+    const stats = {
+      total_anime: (popularData?.total_pages || 0) * 12, // Estimate
+      total_series: (seriesData?.total_pages || 0) * 12,
+      total_movies: (moviesData?.total_pages || 0) * 12,
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error('❌ Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('💥 Server Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error', 
+    message: err.message 
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Endpoint not found',
+    path: req.path 
+  });
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Backend API running on http://localhost:${PORT}`);
-  console.log(`⚠️  SSL verification disabled - FOR DEVELOPMENT ONLY`);
+  console.log(`
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║   🚀 ANIME API SERVER RUNNING                                ║
+║                                                               ║
+║   Port: ${PORT}                                               
+║   Status: ✅ ONLINE                                           ║
+║   Environment: DEVELOPMENT                                    ║
+║   ⚠️  SSL Verification: DISABLED (Development Only)           ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+📡 Available Endpoints:
+
+📍 General:
+   GET  /api/health                     - Health check
+   GET  /api/stats                      - API statistics
+
+🔍 Search & Discovery:
+   GET  /api/search?term=...&page=1&limit=12
+   GET  /api/genre?genre=...&page=1&limit=12
+   GET  /api/popular?duration=month&page=1&limit=12
+   GET  /api/recent?page=1&limit=12
+   GET  /api/random?page=1&limit=12
+
+📺 Content Types:
+   GET  /api/series?page=1&limit=12
+   GET  /api/movies?page=1&limit=12
+   GET  /api/ongoing?page=1&limit=12
+   GET  /api/completed?page=1&limit=12
+   GET  /api/all-content?page=1&limit=50
+
+📖 Anime Details:
+   GET  /api/anime/:slug
+   GET  /api/anime/:id/seasons
+   GET  /api/episodes/:seasonId
+   GET  /api/episode/:episodeId/links
+   GET  /api/movie/:slug/links
+
+════════════════════════════════════════════════════════════════
+
+🌐 Server URL: http://localhost:${PORT}
+📝 Logs are enabled for all requests
+🔧 Ready to handle requests!
+
+════════════════════════════════════════════════════════════════
+  `);
 });

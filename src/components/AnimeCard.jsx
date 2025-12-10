@@ -6,12 +6,12 @@ const FALLBACK_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/
 
 const AnimeCard = ({ anime }) => {
   // Debug - log the actual data being received
-  console.log('=== AnimeCard Debug ===');
-  console.log('Full anime object:', anime);
-  console.log('anime.name:', anime?.name);
-  console.log('anime.image:', anime?.image);
-  console.log('anime.image.poster:', anime?.image?.poster);
-  console.log('======================');
+  // console.log('=== AnimeCard Debug ===');
+  // console.log('Full anime object:', anime);
+  // console.log('anime.name:', anime?.name);
+  // console.log('anime.image:', anime?.image);
+  // console.log('anime.image.poster:', anime?.image?.poster);
+  // console.log('======================');
   
   if (!anime) {
     console.error('AnimeCard: No anime data received!');
@@ -63,7 +63,7 @@ const AnimeCard = ({ anime }) => {
   
   return (
     <Link 
-      to={`/anime/${anime.slug || anime.id}`}
+      to={anime.type === "movie" ? `/watch/${anime.slug || anime.id}` : `/anime/${anime.slug || anime.id}`}
       style={{ textDecoration: 'none', color: 'inherit' }}
     >
       <div 
