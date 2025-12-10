@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 
 // Import your page components
 import HomePage from './pages/HomePage';
@@ -17,7 +18,8 @@ import GenrePage from './pages/GenrePage';
 
 function App() {
   return (
-    <Router>
+    <>
+      <Router>
       <Routes>
         {/* Home Page */}
         <Route path="/" element={<HomePage />} />
@@ -76,7 +78,9 @@ function App() {
           </div>
         } />
       </Routes>
-    </Router>
+      </Router>
+      <Analytics />
+    </>
   );
 }
 
