@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Import your page components
 import HomePage from './pages/HomePage';
@@ -18,6 +19,7 @@ import GenrePage from './pages/GenrePage';
 function App() {
   return (
     <Router>
+      <SpeedInsights />
       <Routes>
         {/* Home Page */}
         <Route path="/" element={<HomePage />} />
