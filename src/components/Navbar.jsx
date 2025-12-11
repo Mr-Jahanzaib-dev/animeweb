@@ -1,36 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, Clock, CheckCircle, Film, Sparkles, Grid, Play, Menu, X, Loader2 } from 'lucide-react';
-
-// Mock searchAnime function for demo
-const searchAnime = async (query, page = 1, limit = 5) => {
-  // Simulated API response
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        posts: [
-          {
-            id: 1,
-            name: 'Attack on Titan',
-            slug: 'attack-on-titan',
-            type: 'TV Series',
-            year: 2013,
-            rating: '9.0',
-            image: { poster: '/placeholder1.jpg' }
-          },
-          {
-            id: 2,
-            name: 'Demon Slayer',
-            slug: 'demon-slayer',
-            type: 'TV Series',
-            year: 2019,
-            rating: '8.7',
-            image: { poster: '/placeholder2.jpg' }
-          }
-        ]
-      });
-    }, 300);
-  });
-};
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { searchAnime } from '../services/api';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -39,20 +10,35 @@ const Navbar = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const searchInputRef = useRef(null);
-  const mobileSearchInputRef = useRef(null);
   const suggestionsRef = useRef(null);
-  const mobileSuggestionsRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
+  // Get poster image URL - matches backend API response
   const getPosterUrl = (anime) => {
-    if (!anime || !anime.image) return null;
+    if (!anime || !anime.image) {
+      return null;
+    }
+
     const posterPath = anime.image.poster;
-    if (!posterPath || posterPath === '' || posterPath === 'null') return null;
-    if (posterPath.startsWith('http://') || posterPath.startsWith('https://')) return posterPath;
-    if (posterPath.startsWith('/')) return `https://image.tmdb.org/t/p/w500${posterPath}`;
+    
+    if (!posterPath || posterPath === '' || posterPath === 'null') {
+      return null;
+    }
+    
+    // If it's a full URL, use it directly
+    if (posterPath.startsWith('http://') || posterPath.startsWith('https://')) {
+      return posterPath;
+    }
+    
+    // If it starts with /, it's a TMDB path
+    if (posterPath.startsWith('/')) {
+      return `https://image.tmdb.org/t/p/w500${posterPath}`;
+    }
+    
     return null;
   };
 
@@ -62,17 +48,14 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Handle clicks outside suggestions to close
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
         suggestionsRef.current && 
         !suggestionsRef.current.contains(event.target) &&
         searchInputRef.current &&
-        !searchInputRef.current.contains(event.target) &&
-        mobileSuggestionsRef.current &&
-        !mobileSuggestionsRef.current.contains(event.target) &&
-        mobileSearchInputRef.current &&
-        !mobileSearchInputRef.current.contains(event.target)
+        !searchInputRef.current.contains(event.target)
       ) {
         setShowSuggestions(false);
       }
@@ -82,6 +65,7 @@ const Navbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Debounced suggestions fetch
   useEffect(() => {
     if (searchQuery.length >= 2) {
       setSuggestionsLoading(true);
@@ -122,8 +106,7 @@ const Navbar = () => {
     if (searchQuery.trim()) {
       setShowSuggestions(false);
       setMenuOpen(false);
-      console.log('Search:', searchQuery);
-      // navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -131,8 +114,7 @@ const Navbar = () => {
     setShowSuggestions(false);
     setSearchQuery('');
     setMenuOpen(false);
-    console.log('Navigate to:', anime.slug);
-    // navigate(`/anime/${anime.slug}`);
+    navigate(`/anime/${anime.slug}`);
   };
 
   const navItems = [
@@ -157,101 +139,31 @@ const Navbar = () => {
             height: `${size.height}px`,
             objectFit: 'cover',
             borderRadius: size.width === 40 ? '4px' : '6px',
-            marginRight: size.width === 40 ? '10px' : '12px',
-            background: '#1a1a1a',
-            flexShrink: 0
+            marginRight: size.width === 40 ? '12px' : '15px',
+            background: '#1a1a1a'
           }}
           loading="lazy"
         />
       );
     }
     
+    // Fallback: show colored placeholder div
     return (
       <div style={{
         width: `${size.width}px`,
         height: `${size.height}px`,
         background: 'linear-gradient(135deg, #333 0%, #1a1a1a 100%)',
         borderRadius: size.width === 40 ? '4px' : '6px',
-        marginRight: size.width === 40 ? '10px' : '12px',
+        marginRight: size.width === 40 ? '12px' : '15px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: '#666',
-        flexShrink: 0
+        fontSize: '10px',
+        textAlign: 'center',
+        padding: '4px'
       }}>
         <Film size={16} />
-      </div>
-    );
-  };
-
-  const SuggestionsDropdown = ({ isMobile = false }) => {
-    const ref = isMobile ? mobileSuggestionsRef : suggestionsRef;
-    
-    return (
-      <div
-        ref={ref}
-        style={{
-          position: 'absolute',
-          top: '100%',
-          left: isMobile ? 0 : 'auto',
-          right: isMobile ? 0 : '1rem',
-          marginTop: '8px',
-          width: isMobile ? '100%' : 'min(350px, 90vw)',
-          background: 'rgba(20, 20, 20, 0.98)',
-          borderRadius: '8px',
-          border: '1px solid rgba(229, 9, 20, 0.3)',
-          maxHeight: isMobile ? '60vh' : '400px',
-          overflowY: 'auto',
-          zIndex: 1001,
-          boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
-        }}
-      >
-        {suggestionsLoading ? (
-          <div style={{ padding: isMobile ? '20px' : '30px', textAlign: 'center' }}>
-            <Loader2 size={isMobile ? 24 : 32} color="#e50914" className="spinning" />
-          </div>
-        ) : suggestions.length > 0 ? (
-          suggestions.map((anime) => (
-            <div
-              key={anime.id}
-              onClick={() => handleSuggestionClick(anime)}
-              className="suggestion-item"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: isMobile ? '10px' : '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                borderBottom: '1px solid rgba(255,255,255,0.05)'
-              }}
-            >
-              {renderSuggestionImage(anime, isMobile ? { width: 40, height: 60 } : { width: 50, height: 75 })}
-              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                <div style={{
-                  fontWeight: '600',
-                  fontSize: isMobile ? '0.9rem' : '1rem',
-                  marginBottom: '2px',
-                  color: '#fff',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {anime.name}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '0.75rem' : '0.85rem',
-                  color: '#999'
-                }}>
-                  {anime.type} {anime.year && `• ${anime.year}`} {anime.rating && !isMobile && `• ⭐ ${anime.rating}`}
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div style={{ padding: isMobile ? '20px' : '30px', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>
-            No results found
-          </div>
-        )}
       </div>
     );
   };
@@ -270,419 +182,345 @@ const Navbar = () => {
         transition: 'all 0.3s ease',
         boxShadow: scrolled ? '0 10px 30px rgba(0,0,0,0.5)' : 'none'
       }}>
-        <div style={{
-          maxWidth: '1400px',
-          margin: '0 auto',
-          padding: '0 clamp(12px, 3vw, 24px)'
-        }}>
-          <nav style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: 'clamp(12px, 2vh, 16px) 0',
-            gap: 'clamp(8px, 2vw, 16px)'
-          }}>
-            {/* Logo */}
-            <a 
-              href="/" 
-              onClick={(e) => { e.preventDefault(); setActiveTab('home'); }}
-              style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                fontSize: 'clamp(1.25rem, 4vw, 1.5rem)',
-                fontWeight: '700',
-                textDecoration: 'none',
-                color: '#fff',
-                flexShrink: 0,
-                gap: '8px'
-              }}
-            >
-              <Play size={window.innerWidth < 768 ? 24 : 28} style={{ fill: '#e50914', color: '#e50914' }} />
-              <span className="logo-text">Dead<span style={{ color: '#e50914' }}>Anime</span></span>
-            </a>
+        <div className="container-fluid px-4">
+          <nav className="navbar navbar-expand-lg navbar-dark py-3">
+            {/* Logo/Brand */}
+            <Link to="/" className="navbar-brand d-flex align-items-center" style={{ fontSize: '1.5rem', fontWeight: '700', textDecoration: 'none', color: '#fff' }}>
+              <Play size={28} className="me-2" style={{ fill: '#e50914', color: '#e50914' }} />
+              <span className="d-none d-lg-inline">Dead</span>
+              <span className="d-none d-lg-inline" style={{ color: '#e50914' }}>Anime</span>
+            </Link>
 
-            {/* Desktop Navigation */}
-            <ul className="desktop-nav">
-              {navItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <li key={item.id}>
-                    <a 
-                      href={item.path}
-                      onClick={(e) => { e.preventDefault(); setActiveTab(item.id); }}
-                      className={isActive ? 'active' : ''}
-                      style={{ 
-                        color: isActive ? '#e50914' : '#fff',
-                        fontWeight: isActive ? '600' : '400',
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        transition: 'all 0.3s ease',
-                        position: 'relative'
-                      }}
-                    >
-                      <Icon size={16} />
-                      {item.name}
-                      {isActive && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '-4px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: '40px',
-                          height: '3px',
-                          background: '#e50914',
-                          borderRadius: '3px'
-                        }} />
-                      )}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* Desktop Search */}
-            <div className="desktop-search">
-              <form onSubmit={handleSearchSubmit} style={{ position: 'relative' }}>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search anime..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
-                  style={{
-                    background: 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '20px',
-                    padding: '8px 40px 8px 16px',
-                    color: '#fff',
-                    width: '100%',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#999',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                >
-                  <Search size={18} />
-                </button>
-              </form>
-              {showSuggestions && <SuggestionsDropdown />}
-            </div>
-
-            {/* Mobile/Tablet Actions */}
-            <div className="mobile-actions">
-              <button 
-                onClick={() => setMenuOpen(!menuOpen)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  padding: '8px',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-              >
-                {menuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
-            </div>
-          </nav>
-        </div>
-
-        {/* Mobile Menu */}
-        <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
-          {/* Mobile Search */}
-          <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-            <form onSubmit={handleSearchSubmit}>
-              <div style={{ position: 'relative' }}>
-                <input
-                  ref={mobileSearchInputRef}
-                  type="text"
-                  placeholder="Search anime..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
-                  style={{
-                    background: 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '20px',
-                    padding: '10px 40px 10px 16px',
-                    color: '#fff',
-                    width: '100%',
-                    fontSize: '1rem'
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#999',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                >
-                  <Search size={20} />
-                </button>
-              </div>
-            </form>
-            {showSuggestions && <SuggestionsDropdown isMobile={true} />}
-          </div>
-
-          {/* Mobile Navigation */}
-          <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0 }}>
-            {navItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <li key={item.id}>
-                  <a 
-                    href={item.path}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setActiveTab(item.id);
-                      setMenuOpen(false);
+            {/* Mobile Search Bar */}
+            <div className="d-lg-none flex-grow-1 mx-3" style={{ position: 'relative' }}>
+              <form onSubmit={handleSearchSubmit}>
+                <div className="position-relative">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    className="form-control"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
+                    style={{
+                      background: 'rgba(255,255,255,0.1)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '20px',
+                      padding: '8px 40px 8px 16px',
+                      color: '#fff',
+                      width: '100%',
+                      fontSize: '0.9rem'
                     }}
-                    style={{ 
-                      color: isActive ? '#e50914' : '#fff',
-                      fontWeight: isActive ? '600' : '400',
-                      textDecoration: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '14px 20px',
-                      transition: 'all 0.3s ease',
-                      background: isActive ? 'rgba(229, 9, 20, 0.1)' : 'transparent'
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#999',
+                      cursor: 'pointer',
+                      padding: '4px'
                     }}
                   >
-                    <Icon size={20} />
-                    <span style={{ fontSize: '1rem' }}>{item.name}</span>
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
+                    <Search size={16} />
+                  </button>
+                </div>
+              </form>
+
+              {/* Mobile Suggestions Dropdown */}
+              {showSuggestions && (
+                <div
+                  ref={suggestionsRef}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '8px',
+                    background: 'rgba(20, 20, 20, 0.98)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(229, 9, 20, 0.3)',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    zIndex: 1001,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                  }}
+                >
+                  {suggestionsLoading ? (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                      <Loader2 size={24} color="#e50914" style={{ animation: 'spin 1s linear infinite' }} />
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((anime) => (
+                      <div
+                        key={anime.id}
+                        onClick={() => handleSuggestionClick(anime)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '10px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          borderBottom: '1px solid rgba(255,255,255,0.05)'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(229, 9, 20, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        {renderSuggestionImage(anime, { width: 40, height: 60 })}
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{
+                            fontWeight: '600',
+                            fontSize: '0.9rem',
+                            marginBottom: '2px',
+                            color: '#fff',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {anime.name}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#999'
+                          }}>
+                            {anime.type} {anime.year && `• ${anime.year}`}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>
+                      No results found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Menu Toggle */}
+            <button 
+              className="navbar-toggler border-0 d-lg-none" 
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{ boxShadow: 'none' }}
+            >
+              {menuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+
+            {/* Desktop Navigation & Search */}
+            <div className={`collapse navbar-collapse ${menuOpen ? 'show' : ''}`}>
+              <ul className="navbar-nav ms-4 me-auto">
+                {navItems.map(item => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <li key={item.id} className="nav-item">
+                      <Link 
+                        to={item.path}
+                        className="nav-link px-3"
+                        style={{ 
+                          color: isActive ? '#e50914' : '#fff',
+                          fontWeight: isActive ? '600' : '400',
+                          position: 'relative',
+                          textDecoration: 'none'
+                        }}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <Icon size={16} className="me-2 d-inline" />
+                        {item.name}
+                        {isActive && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '-8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: '40px',
+                            height: '3px',
+                            background: '#e50914',
+                            borderRadius: '3px'
+                          }} />
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Desktop Search Bar */}
+              <div className="d-none d-lg-flex align-items-center" style={{ position: 'relative' }}>
+                <form onSubmit={handleSearchSubmit} style={{ position: 'relative', marginRight: '1rem' }}>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    className="form-control"
+                    placeholder="Search anime..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
+                    style={{
+                      background: 'rgba(255,255,255,0.1)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '20px',
+                      padding: '8px 40px 8px 16px',
+                      color: '#fff',
+                      width: '250px'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#999',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <Search size={18} />
+                  </button>
+                </form>
+
+                {/* Desktop Suggestions Dropdown */}
+                {showSuggestions && (
+                  <div
+                    ref={suggestionsRef}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: '1rem',
+                      marginTop: '8px',
+                      width: '350px',
+                      background: 'rgba(20, 20, 20, 0.98)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(229, 9, 20, 0.3)',
+                      maxHeight: '400px',
+                      overflowY: 'auto',
+                      zIndex: 1001,
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                    }}
+                  >
+                    {suggestionsLoading ? (
+                      <div style={{ padding: '30px', textAlign: 'center' }}>
+                        <Loader2 size={32} color="#e50914" style={{ animation: 'spin 1s linear infinite' }} />
+                      </div>
+                    ) : suggestions.length > 0 ? (
+                      suggestions.map((anime) => (
+                        <div
+                          key={anime.id}
+                          onClick={() => handleSuggestionClick(anime)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            borderBottom: '1px solid rgba(255,255,255,0.05)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(229, 9, 20, 0.1)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          {renderSuggestionImage(anime, { width: 50, height: 75 })}
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontWeight: '600',
+                              fontSize: '1rem',
+                              marginBottom: '4px',
+                              color: '#fff'
+                            }}>
+                              {anime.name}
+                            </div>
+                            <div style={{
+                              fontSize: '0.85rem',
+                              color: '#999'
+                            }}>
+                              {anime.type} {anime.year && `• ${anime.year}`} {anime.rating && `• ⭐ ${anime.rating}`}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: '30px', textAlign: 'center', color: '#666' }}>
+                        No results found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </nav>
         </div>
       </header>
 
       <style>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        body {
-          margin: 0;
-          padding: 0;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-          background: #0a0a0a;
-          color: #fff;
-          padding-top: 80px;
-        }
-
+        @import url('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+        
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
         
-        .spinning {
-          animation: spin 1s linear infinite;
+        .nav-link:hover { 
+          color: #e50914 !important; 
         }
-
+        
         input::placeholder { 
           color: #666; 
         }
         
         input:focus { 
           outline: none; 
-          border-color: #e50914 !important; 
+          border-color: #e50914; 
           box-shadow: 0 0 0 0.2rem rgba(229, 9, 20, 0.25);
         }
 
-        .suggestion-item:hover {
-          background: rgba(229, 9, 20, 0.1) !important;
-        }
-
-        /* Desktop Navigation - Hidden on mobile/tablet */
-        .desktop-nav {
-          display: none;
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          gap: 4px;
-          flex: 1;
-          max-width: 600px;
-        }
-
-        .desktop-nav li a:hover {
-          background: rgba(229, 9, 20, 0.1);
-        }
-
-        /* Desktop Search - Hidden on mobile/tablet */
-        .desktop-search {
-          display: none;
-          position: relative;
-          width: 250px;
-          flex-shrink: 0;
-        }
-
-        /* Mobile Actions - Visible on mobile/tablet */
-        .mobile-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        /* Mobile Menu */
-        .mobile-menu {
-          position: fixed;
-          top: 100%;
-          left: 0;
-          right: 0;
-          background: rgba(10, 10, 10, 0.98);
-          backdrop-filter: blur(10px);
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-          max-height: 0;
-          overflow: hidden;
-          transition: max-height 0.3s ease, opacity 0.3s ease;
-          opacity: 0;
-          z-index: 999;
-        }
-
-        .mobile-menu.open {
-          max-height: calc(100vh - 80px);
-          opacity: 1;
-          overflow-y: auto;
-        }
-
-        .mobile-menu ul li a:hover {
-          background: rgba(229, 9, 20, 0.05);
-        }
-
-        /* Tablet (768px - 1023px) */
-        @media (min-width: 768px) and (max-width: 1023px) {
-          .logo-text {
-            display: inline !important;
+        /* Mobile Menu Styling */
+        @media (max-width: 991.98px) {
+          .navbar-collapse {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 10, 0.98);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
           }
 
-          .desktop-search {
-            display: block;
-            width: 200px;
+          .navbar-nav {
+            padding: 1rem 0;
           }
 
-          body {
-            padding-top: 70px;
+          .nav-item {
+            padding: 0.5rem 1rem;
+          }
+
+          .nav-link {
+            padding: 0.75rem 1rem !important;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+          }
+
+          .nav-link:hover {
+            background: rgba(229, 9, 20, 0.1);
           }
         }
 
-        /* Desktop (1024px+) */
-        @media (min-width: 1024px) {
-          .desktop-nav {
-            display: flex;
+        /* Ensure proper spacing on mobile */
+        @media (max-width: 575.98px) {
+          .container-fluid {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
           }
-
-          .desktop-search {
-            display: block;
-          }
-
-          .mobile-actions {
-            display: none;
-          }
-
-          .mobile-menu {
-            display: none;
-          }
-
-          .logo-text {
-            display: inline !important;
-          }
-        }
-
-        /* Small mobile (< 375px) */
-        @media (max-width: 374px) {
-          .logo-text {
-            font-size: 1.1rem !important;
-          }
-        }
-
-        /* Medium mobile and up */
-        @media (min-width: 480px) {
-          .desktop-search {
-            width: 220px;
-          }
-        }
-
-        /* Large screens */
-        @media (min-width: 1200px) {
-          .desktop-search {
-            width: 280px;
-          }
-        }
-
-        /* Smooth scrollbar for mobile menu */
-        .mobile-menu::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        .mobile-menu::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.05);
-        }
-
-        .mobile-menu::-webkit-scrollbar-thumb {
-          background: rgba(229, 9, 20, 0.5);
-          border-radius: 3px;
-        }
-
-        /* Custom scrollbar for suggestions */
-        div[style*="overflowY"]::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        div[style*="overflowY"]::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.05);
-        }
-
-        div[style*="overflowY"]::-webkit-scrollbar-thumb {
-          background: rgba(229, 9, 20, 0.5);
-          border-radius: 3px;
         }
       `}</style>
-
-      {/* Demo Content */}
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h1 style={{ margin: '40px 0 20px' }}>Responsive Navbar Demo</h1>
-        <p style={{ color: '#999', maxWidth: '600px', margin: '0 auto 40px' }}>
-          Try resizing your browser window or testing on different devices. 
-          The navbar adapts to mobile (768px), tablet (768px - 1023px), and desktop (1024px+) screens.
-        </p>
-        <div style={{ height: '150vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <p style={{ color: '#666' }}>Scroll to test sticky navbar with backdrop blur effect</p>
-        </div>
-      </div>
     </>
   );
 };
