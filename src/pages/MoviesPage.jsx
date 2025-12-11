@@ -240,10 +240,10 @@ const MoviesPage = () => {
   if (loading) {
     return (
       <>
-        <Helmet>
+      
           <title>Loading Anime Movies... | {siteName}</title>
           <meta name="robots" content="noindex, nofollow" />
-        </Helmet>
+        
         <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff' }}>
           <Navbar />
           <div style={{ 
@@ -346,7 +346,7 @@ const MoviesPage = () => {
 
   return (
     <>
-      <Helmet>
+      
         {/* Primary Meta Tags */}
         <html lang="en" />
         <title>{getPageTitle()}</title>
@@ -423,7 +423,6 @@ const MoviesPage = () => {
         <script type="application/ld+json">
           {JSON.stringify(websiteStructuredData)}
         </script>
-      </Helmet>
 
       <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff' }}>
         <Navbar />

@@ -145,10 +145,8 @@ const HomePage = () => {
   if (loading) {
     return (
       <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff' }}>
-        <Helmet>
           <title>Loading... | AnimeStream</title>
           <meta name="robots" content="noindex" />
-        </Helmet>
         <Navbar />
         <div style={{ 
           display: 'flex', 
@@ -257,7 +255,7 @@ const HomePage = () => {
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff' }}>
       {/* SEO: Comprehensive Meta Tags */}
-      <Helmet>
+      
         {/* Primary Meta Tags */}
         <title>{title}</title>
         <meta name="title" content={title} />
@@ -290,8 +288,6 @@ const HomePage = () => {
         <script type="application/ld+json">
           {JSON.stringify(generateStructuredData())}
         </script>
-      </Helmet>
-
       <Navbar />
 
       {/* SEO: Semantic HTML with proper heading hierarchy */}

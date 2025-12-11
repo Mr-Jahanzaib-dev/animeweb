@@ -232,10 +232,9 @@ const CompletedPage = () => {
   if (loading) {
     return (
       <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff' }}>
-        <Helmet>
+        
           <title>Loading Completed Anime... | AnimeStream</title>
           <meta name="robots" content="noindex" />
-        </Helmet>
         <Navbar />
         <div style={{ 
           display: 'flex', 
@@ -335,7 +334,6 @@ const CompletedPage = () => {
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff' }}>
       {/* SEO: Comprehensive Meta Tags */}
-      <Helmet>
         <title>{pageTitle}</title>
         <meta name="title" content={pageTitle} />
         <meta name="description" content={description} />
@@ -358,7 +356,6 @@ const CompletedPage = () => {
         <script type="application/ld+json">
           {JSON.stringify(generateStructuredData())}
         </script>
-      </Helmet>
 
       <Navbar />
       <main>
