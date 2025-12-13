@@ -1,13 +1,31 @@
 // ⚠️ DEVELOPMENT ONLY - Disable SSL verification
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const https = require('https');
 require('dotenv').config();
-
 const app = express();
+
+// middleware
+app.use(cors());
+app.use(express.json());
+
+// 👇👇 YAHAN ADD KARO (ROUTES KE START ME)
+app.get('/', (req, res) => {
+  res.send('🚀 Anime API is running on Railway');
+});
+
+// baqi saare routes
+app.get('/api/health');
+app.get('/api/search');
+
+// server listen
+app.listen(PORT, () => {
+  console.log('Server running');
+});
 const PORT = process.env.PORT || 5000;
 
 // Middleware
