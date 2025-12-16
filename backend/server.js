@@ -33,7 +33,7 @@ app.use(cors());
 app.use(express.json());
 
 // API Configuration
-const API_BASE_URL = process.env.API_BASE_URL || 'https://your-api-domain.com';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://anime-backend-black.vercel.app/';
 const API_KEY = 'deadtoonszylith';
 
 // Create HTTPS agent that ignores self-signed certificates
